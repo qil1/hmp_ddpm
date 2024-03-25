@@ -1,1 +1,4 @@
-ddpm for human motion prediction
+
+This is an implementation of diffusion model for probabilistic human motion prediction.
+
+We refer to the implementation of ddpm from this repository(https://github.com/zoubohao/DenoisingDiffusionProbabilityModel-ddpm-) and wanted to say thanks to the author here.
