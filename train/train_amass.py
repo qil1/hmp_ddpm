@@ -49,7 +49,7 @@ def train_func(epoch):
     log_str = f"[train epoch {i}] total time: {dt}, average loss: {train_loss}"
     print(log_str)
     with open(os.path.join(config.log_dir, 'train_log.txt'), 'a') as f:
-        f.write(log_str)
+        f.write(log_str+'\n')
 
 
 if __name__ == "__main__":

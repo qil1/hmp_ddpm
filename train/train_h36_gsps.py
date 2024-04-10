@@ -14,7 +14,7 @@ sys.path.append(os.getcwd())
 from utils.opt import Options
 from utils.torch import to_cpu
 from utils.util import seed_torch, cal_total_model_param
-from utils.h36motion3d import Datasets, ACTION, dim_used
+from utils.dataset_h36m import DatasetH36M
 from models.Predictor import Predictor
 from models.Diffusion import GaussianDiffusionTrainer
 
@@ -23,12 +23,12 @@ def train_func(epoch):
     train_loss = 0
     total_num_sample = 0
     t_s = time.time()
-    with tqdm(data_loader, dynamic_ncols=True) as tqdmDataLoader:
-        for (gt3d, _) in tqdmDataLoader:
+    generator = dataset.sampling_generator(num_samples=5000, batch_size=config.batch_size)
+    for gt3d in generator:
+            gt3d = torch.tensor(gt3d)
             gt3d = gt3d.type(dtype).to(device).contiguous()
-            gt3d /= 1000.
-            condition = rearrange(gt3d[:, :config.t_his, dim_used], 'b t (c d) -> b t c d', d=3).clone()
-            future = rearrange(gt3d[:, config.t_his:, dim_used], 'b t (c d) -> b t c d', d=3).clone()
+            condition = gt3d[:, :config.t_his].clone()
+            future = gt3d[:, config.t_his:].clone()
             loss = trainer(future, condition).sum() / 1000.
             optimizer.zero_grad()
             loss.backward()
@@ -37,11 +37,12 @@ def train_func(epoch):
             train_loss += loss
             total_num_sample += 1
 
-            tqdmDataLoader.set_postfix(ordered_dict={
+            sys.stdout.write('\r'+str({
                 "epoch": epoch,
                 "LR": optimizer.state_dict()['param_groups'][0]["lr"],
                 "loss": loss.item()
-            })
+            }))
+            sys.stdout.flush()
     dt = time.time() - t_s
     scheduler.step()
     train_loss /= total_num_sample
@@ -49,6 +50,7 @@ def train_func(epoch):
     print(log_str)
     with open(os.path.join(config.log_dir, 'train_log.txt'), 'a') as f:
         f.write(log_str+'\n')
+    return train_loss
 
 
 if __name__ == "__main__":
@@ -69,9 +71,11 @@ if __name__ == "__main__":
         f.write(config_str)
 
     '''data'''
-    dataset = Datasets(config, split=0)
-    print('>>> Training dataset length: {:d}'.format(dataset.__len__()))
-    data_loader = DataLoader(dataset, batch_size=config.batch_size, shuffle=True, num_workers=8, pin_memory=True)
+    # dataset = Datasets(config, split=0)
+    # print('>>> Training dataset length: {:d}'.format(dataset.__len__()))
+    # data_loader = DataLoader(dataset, batch_size=config.batch_size, shuffle=True, num_workers=8, pin_memory=True)
+
+    dataset = DatasetH36M('test', config.t_his, config.t_pred)
 
     '''model'''
     model = Predictor(config.T, config.t_his, config.t_pred, config.joint_num,
@@ -93,11 +97,16 @@ if __name__ == "__main__":
     optimizer = optim.AdamW(trainer.parameters(), lr=config.lr)
     scheduler = optim.lr_scheduler.MultiStepLR(optimizer, milestones=config.milestones, gamma=0.5)
 
+
+    min_loss = None
     for i in range(0, config.num_epoch):
         print("epoch:", i)
-        train_func(i)
+        loss_now = train_func(i)
 
-        with to_cpu(model):
-            ckpt_path = os.path.join(os.path.join(config.log_dir, 'ckpts'), 'model_%04d.p' % i)
-            model_cp = {'model_dict': model.state_dict()}
-            pickle.dump(model_cp, open(ckpt_path, 'wb'))
+        if min_loss is None or loss_now < min_loss:
+            min_loss = loss_now
+
+            with to_cpu(model):
+                ckpt_path = os.path.join(os.path.join(config.log_dir, 'ckpts'), 'model_best.p')
+                model_cp = {'model_dict': model.state_dict()}
+                pickle.dump(model_cp, open(ckpt_path, 'wb'))

@@ -115,6 +115,65 @@ class GaussianDiffusionSampler(nn.Module):
         return x_0  # torch.clip(x_0, -1, 1)  # 让数值在[-1, 1]范围内
 
 
+class DDIMSampler(nn.Module):
+    def __init__(self, model, beta_1, beta_T, T, w=0., ddim_timesteps=100, ddim_eta=1.0, device=torch.device('cpu')):
+        super().__init__()
+
+        self.register_buffer('betas', torch.linspace(beta_1, beta_T, T).double())  # 0.0001 ~ 0.02
+        alphas = 1. - self.betas
+        self.alphas_bar = torch.cumprod(alphas, dim=0).to(device)
+        self.device = device
+
+        self.model = model
+        self.noise_steps = T
+        self.ddim_timesteps = ddim_timesteps
+        self.w = w
+        self.ddim_eta = ddim_eta
+
+        self.ddim_timestep_seq = np.asarray(
+            list(range(0, self.noise_steps+1, self.noise_steps // self.ddim_timesteps)))[1:] - 1
+
+        self.ddim_timestep_prev_seq = np.append(np.array([0]), self.ddim_timestep_seq[:-1])
+
+        if self.ddim_timestep_seq[0] != 0:
+            self.ddim_timestep_seq = np.append(np.array([0]), self.ddim_timestep_seq)
+            self.ddim_timestep_prev_seq = np.append(np.array([0]), self.ddim_timestep_prev_seq)
+
+    def forward(self, x_T, condition):
+        """
+        X_T (B T_h N 3)
+        """
+        x_t = x_T  # torch.randn((sample_num, self.motion_size[0], self.motion_size[1])).to(self.device)
+
+        for i in reversed(range(0, len(self.ddim_timestep_seq))):
+            sys.stdout.write('\rtimestep: ' + str(i))
+            sys.stdout.flush()
+            # print(self.ddim_timestep_seq[i], self.ddim_timestep_prev_seq[i])
+
+            t = x_t.new_ones([x_T.shape[0], ], dtype=torch.long) * self.ddim_timestep_seq[i]
+            prev_t = x_t.new_ones([x_T.shape[0], ], dtype=torch.long) * self.ddim_timestep_prev_seq[i]
+
+            alpha_bar = extract(self.alphas_bar, t, x_t.shape)  # self.alphas_bar[t][:, None, None, None]
+            if self.ddim_timestep_seq[i] == 0:
+                alpha_bar_prev = x_t.new_ones(x_t.shape, dtype=torch.long)
+            else:
+                alpha_bar_prev = extract(self.alphas_bar, prev_t, x_t.shape)  # self.alphas_bar[prev_t][:, None, None, None]
+
+            predicted_noise = self.model(condition, x_t, t)
+
+            predicted_x0 = (x_t - torch.sqrt((1. - alpha_bar)) * predicted_noise) / torch.sqrt(alpha_bar)
+
+            sigmas_t = self.ddim_eta * torch.sqrt(
+                (1 - alpha_bar_prev) / (1 - alpha_bar) * (1 - alpha_bar / alpha_bar_prev))
+
+            pred_dir_xt = torch.sqrt(1 - alpha_bar_prev - sigmas_t**2) * predicted_noise
+            x_prev = torch.sqrt(alpha_bar_prev) * predicted_x0 + pred_dir_xt + sigmas_t * torch.randn_like(x_t)
+
+            x_t = x_prev
+
+        return x_t
+
+
 if __name__ == "__main__":
     torch.set_default_dtype(torch.float64)
     device = torch.device("cuda:0")

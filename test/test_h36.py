@@ -15,9 +15,9 @@ sys.path.append(os.getcwd())
 from utils.opt import Options
 from utils.draw_h36_tool import draw_pic_single
 from utils.util import seed_torch, cal_total_model_param
-from utils.h36motion3d import Datasets, ACTION, dim_used
+from utils.h36motion3d import Datasets, dim_used
 from models.Predictor import Predictor
-from models.Diffusion import GaussianDiffusionSampler
+from models.Diffusion import  DDIMSampler
 
 
 def test_func(gt3d):
@@ -26,7 +26,9 @@ def test_func(gt3d):
     condition = rearrange(gt3d[:, :config.t_his, dim_used], 'b t (c d) -> b t c d', d=3).clone()
     gt_future = rearrange(gt3d[:, config.t_his:, dim_used], 'b t (c d) -> b t c d', d=3).clone()
     noisy_future = torch.randn(size=gt_future.shape, device=device)
+    st = time.time()
     sampled_future = sampler(noisy_future, condition)
+    print("time =,", time.time()-st)
     sampled_future = rearrange(sampled_future, 'b t c d -> b t (c d)')
 
     joint_to_ignore = np.array([16, 20, 23, 24, 28, 31])
@@ -41,8 +43,8 @@ def test_func(gt3d):
     gt3d_t = rearrange(gt3d[:, :], 'b t (c d) -> b t c d', d=3).contiguous()
     print('\n', gt3d_t.shape, pred32.shape)
 
-    sample_gt = gt3d_t[0].detach().cpu() * 1000
-    sample_pred = pred32[0].detach().cpu() * 1000
+    sample_gt = gt3d_t[5].detach().cpu() * 1000
+    sample_pred = pred32[5].detach().cpu() * 1000
     for t_id in range(config.t_his + config.t_pred):
         im_save_dir = os.path.join(config.log_dir, 'vis')
         if not os.path.exists(im_save_dir):
@@ -62,7 +64,11 @@ if __name__ == "__main__":
     device = torch.device('cuda', index=config.gpu_index) if torch.cuda.is_available() else torch.device('cpu')
 
     config.log_dir = os.path.join(config.log_dir, config.save_dir_name)
-    ckpt_path = os.path.join(os.path.join(config.log_dir, 'ckpts'), 'model_%04d.p' % config.iter)
+    if str.isnumeric(config.iter):
+        model_name = 'model_%04d.p' % int(config.iter)
+    else:
+        model_name = 'model_best.p'
+    ckpt_path = os.path.join(os.path.join(config.log_dir, 'ckpts'), model_name)
 
     '''data'''
     dataset = Datasets(opt=config, split=2, actions=config.test_act)
@@ -84,8 +90,8 @@ if __name__ == "__main__":
     model.load_state_dict(model_cp['model_dict'])
     print(f"loaded {ckpt_path}")
     model.eval()
-    sampler = GaussianDiffusionSampler(
-        model, config.beta_1, config.beta_T, config.T, w=config.w).to(device)
+    sampler = DDIMSampler(
+        model, config.beta_1, config.beta_T, config.T, w=config.w, device=device).to(device)
     sampler.eval()
     cal_total_model_param([sampler])
 

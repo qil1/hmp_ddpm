@@ -17,7 +17,7 @@ from utils.draw_3dpw_tool import draw_pic_single
 from utils.util import seed_torch, cal_total_model_param
 from utils.dpw3_3d import Datasets
 from models.Predictor import Predictor
-from models.Diffusion import GaussianDiffusionSampler
+from models.Diffusion import DDIMSampler
 
 
 def test_func(gt3d):
@@ -56,7 +56,11 @@ if __name__ == "__main__":
     device = torch.device('cuda', index=config.gpu_index) if torch.cuda.is_available() else torch.device('cpu')
 
     config.log_dir = os.path.join(config.log_dir, config.save_dir_name)
-    ckpt_path = os.path.join(os.path.join(config.log_dir, 'ckpts'), 'model_%04d.p' % config.iter)
+    if str.isnumeric(config.iter):
+        model_name = 'model_%04d.p' % int(config.iter)
+    else:
+        model_name = 'model_best.p'
+    ckpt_path = os.path.join(os.path.join(config.log_dir, 'ckpts'), model_name)
 
     '''data'''
     dataset = Datasets(opt=config, split=2)
@@ -78,8 +82,8 @@ if __name__ == "__main__":
     model.load_state_dict(model_cp['model_dict'])
     print(f"loaded {ckpt_path}")
     model.eval()
-    sampler = GaussianDiffusionSampler(
-        model, config.beta_1, config.beta_T, config.T, w=config.w).to(device)
+    sampler = DDIMSampler(
+        model, config.beta_1, config.beta_T, config.T, w=config.w, device=device).to(device)
     sampler.eval()
     cal_total_model_param([sampler])
 
@@ -87,6 +91,6 @@ if __name__ == "__main__":
         cnt = 0
         for batch in test_data_loader:
             cnt += 1
-            if cnt == 6:
+            if cnt == 15:
                 test_func(batch)
                 break

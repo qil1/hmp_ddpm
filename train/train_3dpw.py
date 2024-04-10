@@ -48,7 +48,8 @@ def train_func(epoch):
     log_str = f"[train epoch {i}] total time: {dt}, average loss: {train_loss}"
     print(log_str)
     with open(os.path.join(config.log_dir, 'train_log.txt'), 'a') as f:
-        f.write(log_str)
+        f.write(log_str+'\n')
+    return train_loss
 
 
 if __name__ == "__main__":
@@ -93,11 +94,15 @@ if __name__ == "__main__":
     optimizer = optim.AdamW(trainer.parameters(), lr=config.lr)
     scheduler = optim.lr_scheduler.MultiStepLR(optimizer, milestones=config.milestones, gamma=0.5)
 
+    min_loss = None
     for i in range(0, config.num_epoch):
         print("epoch:", i)
-        train_func(i)
+        loss_now = train_func(i)
 
-        with to_cpu(model):
-            ckpt_path = os.path.join(os.path.join(config.log_dir, 'ckpts'), 'model_%04d.p' % i)
-            model_cp = {'model_dict': model.state_dict()}
-            pickle.dump(model_cp, open(ckpt_path, 'wb'))
+        if min_loss is None or loss_now < min_loss:
+            min_loss = loss_now
+
+            with to_cpu(model):
+                ckpt_path = os.path.join(os.path.join(config.log_dir, 'ckpts'), 'model_best.p')
+                model_cp = {'model_dict': model.state_dict()}
+                pickle.dump(model_cp, open(ckpt_path, 'wb'))
