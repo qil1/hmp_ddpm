@@ -15,19 +15,6 @@ human3.6m
 ```
 [Human3.6M from gsps](https://github.com/wei-mao-2019/gsps)
 
-[CMU-Mocap from ConvSeq2Seq](https://github.com/chaneyddtt/Convolutional-Sequence-to-Sequence-Model-for-Human-Dynamics)
-```
-cmu
-|-- train
-|   |-- basketball
-|   |-- basketball_signal
-|   |-- ...
-`-- test
-    |-- basketball
-    |-- basketball_signal
-    `-- ...
-```
-
 [AMASS dataset from official website](https://amass.is.tue.mpg.de/download.php) (note: you should download the SMPL+H G)
 ```
 amass
