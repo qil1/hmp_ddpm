@@ -23,7 +23,7 @@ def train_func(epoch):
     train_loss = 0
     total_num_sample = 0
     t_s = time.time()
-    generator = dataset.sampling_generator(num_samples=5000, batch_size=config.batch_size)
+    generator = dataset.sampling_generator(num_samples=50000, batch_size=config.batch_size)
     for gt3d in generator:
             gt3d = torch.tensor(gt3d)
             gt3d = gt3d.type(dtype).to(device).contiguous()
@@ -75,7 +75,7 @@ if __name__ == "__main__":
     # print('>>> Training dataset length: {:d}'.format(dataset.__len__()))
     # data_loader = DataLoader(dataset, batch_size=config.batch_size, shuffle=True, num_workers=8, pin_memory=True)
 
-    dataset = DatasetH36M('test', config.t_his, config.t_pred)
+    dataset = DatasetH36M('train', config.t_his, config.t_pred)
 
     '''model'''
     model = Predictor(config.T, config.t_his, config.t_pred, config.joint_num,

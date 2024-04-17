@@ -46,7 +46,8 @@ class DatasetH36M(Dataset):
                 if self.use_vel:
                     v = (np.diff(seq[:, :1], axis=0) * 50).clip(-5.0, 5.0)
                     v = np.append(v, v[[-1]], axis=0)
-                seq[:, 1:] -= seq[:, :1]
+                seq[:, 1:] -= seq[:, :1]  # remove global translation
+                seq = seq[:, 1:]  # discard root joint
                 if self.use_vel:
                     seq = np.concatenate((seq, v), axis=1)
                 data_s[action] = seq

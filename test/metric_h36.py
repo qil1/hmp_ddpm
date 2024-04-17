@@ -6,6 +6,7 @@ import time
 import json
 import pickle
 import numpy as np
+import matplotlib.pyplot as plt
 
 import torch
 import torch.optim as optim
@@ -20,8 +21,27 @@ from models.Predictor import Predictor
 from models.Diffusion import DDIMSampler
 
 
+def draw(pose, path):
+    pose = pose[:, [0, 2, 1]]
+    plt.figure()
+    ax = plt.subplot(111, projection='3d')
+    ax.grid(False)
+    ax.set_xlabel('x')
+    ax.set_ylabel('y')
+    ax.set_zlabel('z')
+    ax.set_xlim3d([-1000, 1000])
+    ax.set_ylim3d([-1000, 1000])
+    ax.set_zlim3d([-1000, 1000])
+
+    for i in range(int(pose.shape[0])):
+        x, z, y = pose[i]
+        ax.scatter(x, y, z, c='b', s=2)
+        ax.text(x, y, z, i, fontsize=6)
+    plt.savefig(path)
+
+
 def test_func():
-    generator = dataset.sampling_generator(num_samples=1000, batch_size=1)
+    generator = dataset.sampling_generator(num_samples=5000, batch_size=1)  # TODO: num_samples full eval, mutimodal
     stats_names = ['APD', 'ADE', 'FDE']
     stats_meter = {x: AverageMeter() for x in stats_names}
     K = 50
@@ -39,6 +59,13 @@ def test_func():
         stacked_condition = condition.repeat(K, 1, 1, 1)
         pred32 = sampler(stacked_noise_future, stacked_condition)
 
+        # if cnt == 5:
+        #     pred_t = pred[0][0].cpu()*1000
+        #     for t_id in range(pred_t.shape[0]):
+        #         im_save_dir = os.path.join(config.log_dir, 'vis')
+        #         if not os.path.exists(im_save_dir):
+        #             os.mkdir(im_save_dir)
+        #         draw(pred_t[t_id], os.path.join(im_save_dir, f'pred_{t_id}.png'))
         pred = torch.unsqueeze(pred32, 1)
         apd, ade, fde = cal_metrics(gt3d_t.cpu(), pred.cpu())
         stats_meter['APD'].update(apd)
