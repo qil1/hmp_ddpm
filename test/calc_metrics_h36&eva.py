@@ -14,9 +14,7 @@ from torch.utils.data import DataLoader
 
 sys.path.append(os.getcwd())
 from utils.opt import Options
-from utils.draw_h36_tool import draw_pic_single
 from utils.util import seed_torch, cal_total_model_param, AverageMeter, compute_all_metrics
-# from utils.dataset_h36m import DatasetH36M
 from utils.dataset_h36m_multimodal import DatasetH36M_multi, get_multimodal_gt_full
 from utils.dataset_humaneva_multimodal import DatasetHumanEva_multi
 from models.Predictor import Predictor

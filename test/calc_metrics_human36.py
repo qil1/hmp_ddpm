@@ -13,7 +13,6 @@ from torch.utils.data import DataLoader
 
 sys.path.append(os.getcwd())
 from utils.opt import Options
-from utils.draw_h36_tool import draw_pic_single
 from utils.util import seed_torch, cal_total_model_param, AverageMeter, cal_metrics
 from utils.h36motion3d import Datasets, dim_used
 from models.Predictor import Predictor

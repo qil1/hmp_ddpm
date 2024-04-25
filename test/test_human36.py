@@ -13,11 +13,11 @@ from torch.utils.data import DataLoader
 
 sys.path.append(os.getcwd())
 from utils.opt import Options
-from utils.draw_h36_tool import draw_pic_single
+from utils.draw_human36_tool import draw_pic_single
 from utils.util import seed_torch, cal_total_model_param
 from utils.h36motion3d import Datasets, dim_used
 from models.Predictor import Predictor
-from models.Diffusion import  DDIMSampler
+from models.Diffusion import DDIMSampler
 
 
 def test_func(gt3d):
