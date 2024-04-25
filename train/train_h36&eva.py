@@ -15,11 +15,13 @@ from utils.opt import Options
 from utils.torch import to_cpu
 from utils.util import seed_torch, cal_total_model_param
 from utils.dataset_h36m import DatasetH36M
+from utils.dataset_humaneva import DatasetHumanEva
 from models.Predictor import Predictor
 from models.Diffusion import GaussianDiffusionTrainer
 
 
 def train_func(epoch):
+    trainer.train()
     train_loss = 0
     total_num_sample = 0
     t_s = time.time()
@@ -53,6 +55,37 @@ def train_func(epoch):
     return train_loss
 
 
+def val_func(epoch):
+    trainer.eval()
+    generator_val = dataset_test.sampling_generator(num_samples=5000, batch_size=config.batch_size)
+    val_loss = 0
+    total_num_sample = 0
+    t_s = time.time()
+    for gt3d in generator_val:
+            gt3d = torch.tensor(gt3d)
+            gt3d = gt3d.type(dtype).to(device).contiguous()
+            condition = gt3d[:, :config.t_his].clone()
+            future = gt3d[:, config.t_his:].clone()
+            loss = trainer(future, condition).sum() / 1000.
+
+            val_loss += loss
+            total_num_sample += 1
+
+            sys.stdout.write('\r'+str({
+                "epoch": epoch,
+                "LR": optimizer.state_dict()['param_groups'][0]["lr"],
+                "val_loss": loss.item()
+            }))
+            sys.stdout.flush()
+    dt = time.time() - t_s
+    val_loss /= total_num_sample
+    log_str = f"[val epoch {i}] total time: {dt}, average loss: {val_loss}"
+    print(log_str)
+    with open(os.path.join(config.log_dir, 'train_log.txt'), 'a') as f:
+        f.write(log_str+'\n')
+    return val_loss
+
+
 if __name__ == "__main__":
     config = Options().parse()
     seed_torch(config.seed)
@@ -75,7 +108,9 @@ if __name__ == "__main__":
     # print('>>> Training dataset length: {:d}'.format(dataset.__len__()))
     # data_loader = DataLoader(dataset, batch_size=config.batch_size, shuffle=True, num_workers=8, pin_memory=True)
 
-    dataset = DatasetH36M('train', config.t_his, config.t_pred)
+    dataset_cls = DatasetH36M if config.dataset == 'h36m' else DatasetHumanEva
+    dataset = dataset_cls('train', config.t_his, config.t_pred, actions='all')
+    dataset_test = dataset_cls('test', config.t_his, config.t_pred, actions='all')
 
     '''model'''
     model = Predictor(config.T, config.t_his, config.t_pred, config.joint_num,
@@ -101,12 +136,15 @@ if __name__ == "__main__":
     min_loss = None
     for i in range(0, config.num_epoch):
         print("epoch:", i)
-        loss_now = train_func(i)
+        train_func(i)
 
-        if min_loss is None or loss_now < min_loss:
-            min_loss = loss_now
+        with torch.no_grad():
+            loss_now = val_func(i)
 
-            with to_cpu(model):
-                ckpt_path = os.path.join(os.path.join(config.log_dir, 'ckpts'), 'model_best.p')
-                model_cp = {'model_dict': model.state_dict()}
-                pickle.dump(model_cp, open(ckpt_path, 'wb'))
+            if min_loss is None or loss_now < min_loss:
+                min_loss = loss_now
+
+                with to_cpu(model):
+                    ckpt_path = os.path.join(os.path.join(config.log_dir, 'ckpts'), 'model_best.p')
+                    model_cp = {'model_dict': model.state_dict()}
+                    pickle.dump(model_cp, open(ckpt_path, 'wb'))

@@ -29,6 +29,8 @@ class Options:
         self.parser.add_argument('--save_dir_name', type=str, default='tmp')
         self.parser.add_argument('--log_dir', type=str, default='./logs')
         self.parser.add_argument('--skip_rate', type=int, default=1, help='skip rate of samples')
+        self.parser.add_argument('--dataset', type=str, default='h36m')  # gsps dataset
+        self.parser.add_argument('--multimodal_threshold', type=float, default=0.5)
         # ===============================================================
         #                     Model options
         # ===============================================================
